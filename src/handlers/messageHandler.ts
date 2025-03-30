@@ -16,6 +16,7 @@ export class MessageHandler implements BotMessageHandler {
         try {
             const currentConfig = await SupabaseService.getBotConfig(botConfig.id);
             const systemPrompt = currentConfig?.system_prompt || botConfig.system_prompt;
+            const displayName = currentConfig?.displayname || botConfig.displayname;
 
             if (text) {
                 const answer = await AIService.ask(text, systemPrompt);
@@ -46,15 +47,18 @@ export class MessageHandler implements BotMessageHandler {
     async handleImageCommand(bot: TelegramBot, chatId: number, botId: string): Promise<void> {
         try {
             const chat = await bot.getChat(chatId);
-            console.log({bot});
+            const botConfig = await SupabaseService.getBotConfig(botId);
+            const displayName = botConfig?.displayname || 'Bot';
+            
             const photos = await SupabaseService.getUploadPhotos(chatId.toString(), botId);
             console.log({photos});
             
             if (photos.length === 0) {
-                await bot.sendMessage(chatId, "No uploaded photos found.");
+                await bot.sendMessage(chatId, `${displayName} hasn't uploaded any photos yet.`);
                 return;
             }
             
+            await bot.sendMessage(chatId, `${displayName} is showing you the uploaded photos:`);
             for (const photo of photos) {
                 await bot.sendPhoto(chatId, photo.photo_url);
             }

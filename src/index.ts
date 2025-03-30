@@ -27,7 +27,7 @@ class TelegramBotManager {
     private async logBotStatus(): Promise<void> {
         console.log('Current bot instances:', this.botInstances.length);
         const bots = await SupabaseService.getBotsConfig();
-        console.log('Configured bots:', bots?.length);
+        console.log('Configured bots:', bots?.map(bot => bot.displayname).join(', '));
     }
 
     private setupBotHandlers(bot: TelegramBot, botConfig: BotConfig): void {
@@ -55,9 +55,9 @@ class TelegramBotManager {
             this.botInstances.push(bot);
             this.setupBotHandlers(bot, botConfig);
             await AIService.initialize(botConfig);
-            console.log('Bot added:', botConfig.name);
+            console.log('Bot added:', botConfig.displayname);
         } catch (error) {
-            console.error(`Error adding bot ${botConfig.name}:`, error);
+            console.error(`Error adding bot ${botConfig.displayname}:`, error);
         }
     }
 

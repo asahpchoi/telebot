@@ -4,6 +4,7 @@ import TelegramBot from 'node-telegram-bot-api';
 export interface BotConfig {
     id: string;
     name: string;
+    displayname: string;
     api_key: string;
     system_prompt: string;
     created_at: string;
