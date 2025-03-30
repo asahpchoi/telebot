@@ -1,7 +1,9 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
-import { ask } from './model';
-import { getBotsConfig, getBotConfig, getChatHistory, BotConfig, saveChatHistory, getUploadPhotos, UploadedPhoto } from './supabase';
+import { BotConfig } from './types';
+import { SupabaseService } from './services/supabase';
+import { AIService } from './services/ai';
+import { MessageHandler } from './handlers/messageHandler';
 
 // Load environment variables
 dotenv.config();
@@ -9,9 +11,11 @@ dotenv.config();
 class TelegramBotManager {
     private botInstances: TelegramBot[] = [];
     private readonly LOG_INTERVAL = 10000; // 10 seconds
+    private messageHandler: MessageHandler;
 
     constructor() {
         this.setupLogging();
+        this.messageHandler = new MessageHandler();
     }
 
     private setupLogging(): void {
@@ -22,21 +26,21 @@ class TelegramBotManager {
 
     private async logBotStatus(): Promise<void> {
         console.log('Current bot instances:', this.botInstances.length);
-        const bots = await getBotsConfig();
+        const bots = await SupabaseService.getBotsConfig();
         console.log('Configured bots:', bots?.length);
     }
 
     private setupBotHandlers(bot: TelegramBot, botConfig: BotConfig): void {
         // Handle /image command
-        bot.onText(/\/image/, async (msg: Message) => {
+        bot.onText(/\/image/, async (msg) => {
             const chatId = msg.chat.id;
             console.log({ chatId });
-            await this.handleImageCommand(bot, chatId, botConfig.id);
+            await this.messageHandler.handleImageCommand(bot, chatId, botConfig.id);
         });
 
         // Handle regular messages
-        bot.on('message', async (msg: Message) => {
-            await this.handleMessage(bot, msg, botConfig);
+        bot.on('message', async (msg) => {
+            await this.messageHandler.handleMessage(bot, msg, botConfig);
         });
 
         // Handle errors
@@ -45,77 +49,12 @@ class TelegramBotManager {
         });
     }
 
-    private async handleImageCommand(bot: TelegramBot, chatId: number, botId: string): Promise<void> {
-        try {
-            const chat = (await bot.getChat(chatId));
-            console.log({botId});
-            const photos = await getUploadPhotos(chatId.toString(), botId);
-            console.log({photos});
-            
-            if (photos.length === 0) {
-                await bot.sendMessage(chatId, "No uploaded photos found.");
-                return;
-            }
-            
-            for (const photo of photos) {
-                await bot.sendPhoto(chatId, photo.photo_url);
-            }
-            
-            // await bot.sendPhoto(chatId, 'gemini-native-image.png');
-        } catch (error) {
-            console.error('Error handling image command:', error);
-            await bot.sendMessage(chatId, "Error retrieving photos.");
-        }
-    }
-
-    private async handleMessage(bot: TelegramBot, msg: Message, botConfig: BotConfig): Promise<void> {
-        const chatId = msg.chat.id;
-        const text = msg.text;
-
-        // Ignore commands
-        if (text?.startsWith('/')) {
-            return;
-        }
-
-        try {
-            const currentConfig = await getBotConfig(botConfig.id);
-            const systemPrompt = `Your role: ${currentConfig?.role}
-                Your personality: ${currentConfig?.personality}
-                Your style: ${currentConfig?.style}
-                Instructions: ${currentConfig?.system_prompt}`;
-
-            console.log({systemPrompt});
-
-            if (text) {
-                const chatHistory = await getChatHistory(chatId.toString())
-                const answer = await ask(text, systemPrompt, chatHistory);
-                await bot.sendMessage(chatId, answer);
-                const chat = await bot.getChat(chatId);
-                 
-                
-                // Get a user identifier - username if available, otherwise use first_name or chat ID
-                const userId = chat.username || 
-                               chat.first_name || 
-                               chat.title || 
-                               chatId.toString();
-                
-                saveChatHistory(botConfig.id, userId, chatId.toString(), text, answer);
-            }
-        } catch (error) {
-            console.error('Error handling message:', error);
-            await bot.sendMessage(chatId, 'Sorry, I encountered an error processing your message.');
-        }
-    }
-
     private async addBot(botConfig: BotConfig): Promise<void> {
         try {
-            console.log({botConfig});
             const bot = new TelegramBot(botConfig.api_key, { polling: true });
-            
             this.botInstances.push(bot);
-       
-            
             this.setupBotHandlers(bot, botConfig);
+            await AIService.initialize(botConfig);
             console.log('Bot added:', botConfig.name);
         } catch (error) {
             console.error(`Error adding bot ${botConfig.name}:`, error);
@@ -125,11 +64,11 @@ class TelegramBotManager {
     public async start(): Promise<void> {
         console.log('Starting bot manager...');
         try {
-            const bots = await getBotsConfig();
+            const bots = await SupabaseService.getBotsConfig();
             if (!bots || bots.length === 0) {
                 console.error('No bots found in configuration');
                 return;
-            }            
+            }
 
             await Promise.all(bots.map(bot => this.addBot(bot)));
             console.log('All bots started successfully');
