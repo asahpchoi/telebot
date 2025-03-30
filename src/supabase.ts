@@ -11,6 +11,10 @@ export interface BotConfig {
   system_prompt: string;
   created_at: string;
   updated_at: string;
+  displayname: string;
+  style: string;
+  role: string;
+  personality: string;
 }
 
 export interface ChatHistory {

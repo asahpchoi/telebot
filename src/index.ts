@@ -79,14 +79,19 @@ class TelegramBotManager {
 
         try {
             const currentConfig = await getBotConfig(botConfig.id);
-            const systemPrompt = currentConfig?.system_prompt || botConfig.system_prompt;
+            const systemPrompt = `Your role: ${currentConfig?.role}
+                Your personality: ${currentConfig?.personality}
+                Your style: ${currentConfig?.style}
+                Instructions: ${currentConfig?.system_prompt}`;
+
+            console.log({systemPrompt});
 
             if (text) {
                 const chatHistory = await getChatHistory(chatId.toString())
                 const answer = await ask(text, systemPrompt, chatHistory);
                 await bot.sendMessage(chatId, answer);
                 const chat = await bot.getChat(chatId);
-                console.log({chat});
+                 
                 
                 // Get a user identifier - username if available, otherwise use first_name or chat ID
                 const userId = chat.username || 
@@ -104,8 +109,12 @@ class TelegramBotManager {
 
     private async addBot(botConfig: BotConfig): Promise<void> {
         try {
+            console.log({botConfig});
             const bot = new TelegramBot(botConfig.api_key, { polling: true });
+            
             this.botInstances.push(bot);
+       
+            
             this.setupBotHandlers(bot, botConfig);
             console.log('Bot added:', botConfig.name);
         } catch (error) {
@@ -120,7 +129,7 @@ class TelegramBotManager {
             if (!bots || bots.length === 0) {
                 console.error('No bots found in configuration');
                 return;
-            }
+            }            
 
             await Promise.all(bots.map(bot => this.addBot(bot)));
             console.log('All bots started successfully');
