@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "ts-node src/model.ts"
+    "server": "pm2 start dist/index.js --name telebot"
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
