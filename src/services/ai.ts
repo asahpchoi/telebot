@@ -6,6 +6,7 @@ export class AIService {
     private static ai: GoogleGenAI | null = null;
 
     static async initialize(apiKey: string): Promise<void> {
+        console.log({apiKey});
         this.ai = new GoogleGenAI({
             apiKey: apiKey,
         });
