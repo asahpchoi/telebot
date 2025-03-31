@@ -1,21 +1,20 @@
 import TelegramBot from 'node-telegram-bot-api';
-import dotenv from 'dotenv';
 import { BotConfig } from './types';
 import { SupabaseService } from './services/supabase';
 import { AIService } from './services/ai';
 import { MessageHandler } from './handlers/messageHandler';
-
-// Load environment variables
-dotenv.config();
+import { TelegramClientService } from './services/telegram/client';
+import { validateEnvironment } from './config/environment';
 
 class TelegramBotManager {
     private botInstances: TelegramBot[] = [];
     private readonly LOG_INTERVAL = 10000; // 10 seconds
     private messageHandler: MessageHandler;
-
+    private google_api_key: string;
     constructor() {
         this.setupLogging();
         this.messageHandler = new MessageHandler();
+        this.google_api_key = process.env.GOOGLE_API_KEY || '';
     }
 
     private setupLogging(): void {
@@ -54,7 +53,7 @@ class TelegramBotManager {
             const bot = new TelegramBot(botConfig.api_key, { polling: true });
             this.botInstances.push(bot);
             this.setupBotHandlers(bot, botConfig);
-            await AIService.initialize(botConfig);
+            await AIService.initialize(this.google_api_key);
             console.log('Bot added:', botConfig.displayname);
         } catch (error) {
             console.error(`Error adding bot ${botConfig.displayname}:`, error);
@@ -90,24 +89,51 @@ class TelegramBotManager {
     }
 }
 
-// Create and start the bot manager
-const botManager = new TelegramBotManager();
-botManager.start();
+async function main() {
+    try {
+        /*
+        // Initialize Telegram client
+        const config = validateEnvironment();
+        const telegramClient = new TelegramClientService(
+            config.apiId,
+            config.apiHash,
+            config.phoneNumber
+        );
+        // Start Telegram client
+        await telegramClient.start();
+        await telegramClient.createBot("avatar33323bot", "Asa Choi");
+        */
 
-// Handle process termination
-process.on('SIGINT', () => {
-    console.log('Received SIGINT. Cleaning up...');
-    botManager.cleanup();
-    process.exit(0);
-});
+        // Create and start the bot manager
+        const botManager = new TelegramBotManager();
+        await botManager.start();
 
-process.on('SIGTERM', () => {
-    console.log('Received SIGTERM. Cleaning up...');
-    botManager.cleanup();
-    process.exit(0);
-});
 
- 
+
+
+        // Handle process termination
+        process.on('SIGINT', async () => {
+            console.log('Received SIGINT. Cleaning up...');
+            botManager.cleanup();
+            //await telegramClient.disconnect();
+            process.exit(0);
+        });
+
+        process.on('SIGTERM', async () => {
+            console.log('Received SIGTERM. Cleaning up...');
+            botManager.cleanup();
+            //await telegramClient.disconnect();
+            process.exit(0);
+        });
+    } catch (error) {
+        console.error('Fatal error:', error);
+        process.exit(1);
+    }
+}
+
+main();
+
+
 
 
 

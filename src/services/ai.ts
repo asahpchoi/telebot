@@ -5,9 +5,9 @@ import fs from 'fs';
 export class AIService {
     private static ai: GoogleGenAI | null = null;
 
-    static async initialize(botConfig: BotConfig): Promise<void> {
+    static async initialize(apiKey: string): Promise<void> {
         this.ai = new GoogleGenAI({
-            apiKey: botConfig.api_key,
+            apiKey: apiKey,
         });
     }
 

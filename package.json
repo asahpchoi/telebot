@@ -13,7 +13,8 @@
     "@google/genai": "^0.7.0",
     "@supabase/supabase-js": "^2.49.4",
     "dotenv": "^16.4.7",
-    "node-telegram-bot-api": "^0.64.0"
+    "node-telegram-bot-api": "^0.64.0",
+    "telegram": "^2.26.22"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",
