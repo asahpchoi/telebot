@@ -8,7 +8,7 @@ import { validateEnvironment } from './config/environment';
 
 class TelegramBotManager {
     private botInstances: TelegramBot[] = [];
-    private readonly LOG_INTERVAL = 10000; // 10 seconds
+    private readonly LOG_INTERVAL = 600000; // 10 seconds
     private messageHandler: MessageHandler;
     private google_api_key: string;
     constructor() {
