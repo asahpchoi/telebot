@@ -18,7 +18,7 @@ export class TelegramClientService {
         private readonly phoneNumber: string
     ) {}
 
-    public async createBot(username: string, botname: string): Promise<null> {
+    public async createBot(username: string, botname: string): Promise<string> {
         if (!this.client) {
             throw new Error('Client is not initialized. Call start() first.');
         }
@@ -39,9 +39,8 @@ export class TelegramClientService {
             const messages = await this.client.getMessages("botFather", {limit:1});
             const index = messages[0].message.search(/\d{10}:\w{35}/g);
             const token = messages[0].message.substring(index, index + 46);
-            console.log({token});
-            console.log('Bot creation steps completed');
-            return null;
+      
+            return token;
         } catch (error) {
             console.error('Error creating bot:', error);
             throw error;

@@ -97,4 +97,16 @@ export class SupabaseService {
 
         return data || [];
     }
+
+    static async updateBotApiKey(botId: string, apiKey: string): Promise<void> {
+        const { error } = await supabase
+            .from('bot_configs')
+            .update({ api_key: apiKey })
+            .eq('name', botId);
+
+        if (error) {
+            console.error('Error updating bot API key:', error);
+            throw error;
+        }
+    }
 } 
