@@ -6,121 +6,160 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
 const supabase_1 = require("./services/supabase");
 const ai_1 = require("./services/ai");
-const messageHandler_1 = require("./handlers/messageHandler");
 const client_1 = require("./services/telegram/client");
 const environment_1 = require("./config/environment");
+const botInstance_1 = require("./services/botInstance");
+const logger_1 = require("./services/logger");
+/**
+ * Main class responsible for managing multiple Telegram bots.
+ * Implements the ITelegramBotManager interface to ensure consistent behavior.
+ */
 class TelegramBotManager {
     constructor() {
+        // Store active bot instances
         this.botInstances = [];
-        this.LOG_INTERVAL = 600000; // 10 seconds
+        // Logger instance for consistent logging across the application
+        this.logger = logger_1.Logger.getInstance();
+        // Configuration settings for the bot manager
+        this.config = {
+            logInterval: 600000, // 10 minutes - interval for status logging
+            maxRetries: 3, // Maximum number of retries for failed operations
+            retryDelay: 5000 // 5 seconds - delay between retries
+        };
         this.setupLogging();
-        this.messageHandler = new messageHandler_1.MessageHandler();
-        this.google_api_key = process.env.GOOGLE_API_KEY || '';
     }
+    /**
+     * Creates a new Telegram bot and updates its API key in the database.
+     * @param bot_id - The unique identifier for the bot
+     * @param bot_name - The display name for the bot
+     * @throws Error if bot creation or database update fails
+     */
     async createBot(bot_id, bot_name) {
-        // Initialize Telegram client
-        const config = (0, environment_1.validateEnvironment)();
-        const telegramClient = new client_1.TelegramClientService(config.apiId, config.apiHash, config.phoneNumber);
-        // Start Telegram client
-        await telegramClient.start();
-        const api_key = await telegramClient.createBot(bot_id, bot_name);
-        console.log({ api_key });
-        // Update the API key in Supabase
-        await supabase_1.SupabaseService.updateBotApiKey(bot_id, api_key);
+        try {
+            // Validate and get environment configuration
+            const config = (0, environment_1.validateEnvironment)();
+            // Initialize Telegram client with environment variables
+            const telegramClient = new client_1.TelegramClientService(config.apiId, config.apiHash, config.phoneNumber);
+            // Start the Telegram client and create the bot
+            await telegramClient.start();
+            const api_key = await telegramClient.createBot(bot_id, bot_name);
+            this.logger.info('Bot created', { bot_id, api_key });
+            // Update the bot's API key in the database
+            await supabase_1.SupabaseService.updateBotApiKey(bot_id, api_key);
+        }
+        catch (error) {
+            this.logger.error('Error creating bot:', error);
+            throw error;
+        }
     }
+    /**
+     * Sets up periodic logging of bot status
+     */
     setupLogging() {
         setInterval(() => {
             this.logBotStatus();
-        }, this.LOG_INTERVAL);
+        }, this.config.logInterval);
     }
+    /**
+     * Logs the current status of all bots, including active instances and configured bots
+     */
     async logBotStatus() {
-        console.log('Current bot instances:', this.botInstances.length);
         const bots = await supabase_1.SupabaseService.getBotsConfig();
-        console.log({ bots });
-        console.log('Configured bots:', bots?.map(bot => bot.displayname).join(', '));
-    }
-    setupBotHandlers(bot, botConfig) {
-        // Handle /image command
-        bot.onText(/\/image/, async (msg) => {
-            const chatId = msg.chat.id;
-            console.log({ chatId });
-            await this.messageHandler.handleImageCommand(bot, chatId, botConfig.id);
-        });
-        // Handle regular messages
-        bot.on('message', async (msg) => {
-            await this.messageHandler.handleMessage(bot, msg, botConfig);
-        });
-        // Handle errors
-        bot.on('polling_error', (error) => {
-            console.error('Polling error:', error);
+        this.logger.info('Bot Status', {
+            activeInstances: this.botInstances.length,
+            configuredBots: bots?.map(bot => bot.displayname)
         });
     }
+    /**
+     * Adds a new bot instance to the manager and initializes it
+     * @param botConfig - Configuration for the bot to be added
+     * @throws Error if bot initialization fails
+     */
     async addBot(botConfig) {
         try {
+            // Create new Telegram bot instance with polling enabled
             const bot = new node_telegram_bot_api_1.default(botConfig.api_key, { polling: true });
-            this.botInstances.push(bot);
-            this.setupBotHandlers(bot, botConfig);
-            await ai_1.AIService.initialize(this.google_api_key);
-            console.log('Bot added:', botConfig.displayname);
+            // Create bot instance wrapper with handlers
+            const botInstance = new botInstance_1.BotInstance(bot, botConfig);
+            // Add to active instances
+            this.botInstances.push(botInstance);
+            // Start the bot instance
+            await botInstance.start();
+            // Initialize AI service for the bot
+            await ai_1.AIService.initialize(process.env.GOOGLE_API_KEY || '');
+            this.logger.info('Bot added successfully', { botName: botConfig.displayname });
         }
         catch (error) {
-            console.error(`Error adding bot ${botConfig.displayname}:`, error);
+            this.logger.error(`Error adding bot ${botConfig.displayname}:`, error);
+            throw error;
         }
     }
+    /**
+     * Starts the bot manager and initializes all configured bots
+     * @throws Error if initialization fails
+     */
     async start() {
-        console.log('Starting bot manager...');
+        this.logger.info('Starting bot manager...');
         try {
+            // Get all bot configurations from the database
             const bots = await supabase_1.SupabaseService.getBotsConfig();
             if (!bots || bots.length === 0) {
-                console.error('No bots found in configuration');
+                this.logger.warn('No bots found in configuration');
                 return;
             }
-            console.log({ bots });
-            await Promise.all(bots.filter(bot => bot.api_key != 'tbc').map(bot => this.addBot(bot)));
-            console.log('All bots started successfully');
-            await Promise.all(bots.filter(bot => bot.api_key === 'tbc').map(async (bot) => {
-                const token = await this.createBot(bot.name, bot.displayname);
-            }));
+            // Start existing bots (those with valid API keys)
+            await Promise.all(bots
+                .filter(bot => bot.api_key !== 'tbc')
+                .map(bot => this.addBot(bot)));
+            // Create and start new bots (those with 'tbc' API key)
+            await Promise.all(bots
+                .filter(bot => bot.api_key === 'tbc')
+                .map(bot => this.createBot(bot.name, bot.displayname)));
+            this.logger.info('Bot manager started successfully');
         }
         catch (error) {
-            console.error('Error starting bots:', error);
+            this.logger.error('Error starting bot manager:', error);
+            throw error;
         }
     }
+    /**
+     * Cleans up all bot instances and resources
+     */
     cleanup() {
-        console.log('Cleaning up bot instances...');
-        this.botInstances.forEach(bot => {
-            try {
-                bot.close();
-            }
-            catch (error) {
-                console.error('Error closing bot:', error);
-            }
-        });
-        this.botInstances = [];
+        this.logger.info('Cleaning up bot instances...');
+        // Stop all bot instances
+        this.botInstances.forEach(instance => instance.stop());
+        // Clear the instances array
+        this.botInstances.length = 0;
     }
 }
+/**
+ * Main application entry point
+ * Sets up the bot manager and handles process termination
+ */
 async function main() {
+    const logger = logger_1.Logger.getInstance();
     try {
         // Create and start the bot manager
         const botManager = new TelegramBotManager();
         await botManager.start();
-        // Handle process termination
+        // Handle graceful shutdown on SIGINT (Ctrl+C)
         process.on('SIGINT', async () => {
-            console.log('Received SIGINT. Cleaning up...');
+            logger.info('Received SIGINT. Cleaning up...');
             botManager.cleanup();
-            //await telegramClient.disconnect();
             process.exit(0);
         });
+        // Handle graceful shutdown on SIGTERM
         process.on('SIGTERM', async () => {
-            console.log('Received SIGTERM. Cleaning up...');
+            logger.info('Received SIGTERM. Cleaning up...');
             botManager.cleanup();
-            //await telegramClient.disconnect();
             process.exit(0);
         });
     }
     catch (error) {
-        console.error('Fatal error:', error);
+        logger.error('Fatal error:', error);
         process.exit(1);
     }
 }
+// Start the application
 main();
