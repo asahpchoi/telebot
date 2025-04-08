@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "server": "pm2 start dist/index.js --name telebot"
+    "server": "pm2 start dist/index.js --name telebot --cron-restart=\"*/10 * * * *\""
+
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
