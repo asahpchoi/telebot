@@ -7,6 +7,8 @@ const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api")
 const supabase_1 = require("./services/supabase");
 const ai_1 = require("./services/ai");
 const messageHandler_1 = require("./handlers/messageHandler");
+const client_1 = require("./services/telegram/client");
+const environment_1 = require("./config/environment");
 class TelegramBotManager {
     constructor() {
         this.botInstances = [];
@@ -14,6 +16,17 @@ class TelegramBotManager {
         this.setupLogging();
         this.messageHandler = new messageHandler_1.MessageHandler();
         this.google_api_key = process.env.GOOGLE_API_KEY || '';
+    }
+    async createBot(bot_id, bot_name) {
+        // Initialize Telegram client
+        const config = (0, environment_1.validateEnvironment)();
+        const telegramClient = new client_1.TelegramClientService(config.apiId, config.apiHash, config.phoneNumber);
+        // Start Telegram client
+        await telegramClient.start();
+        const api_key = await telegramClient.createBot(bot_id, bot_name);
+        console.log({ api_key });
+        // Update the API key in Supabase
+        await supabase_1.SupabaseService.updateBotApiKey(bot_id, api_key);
     }
     setupLogging() {
         setInterval(() => {
@@ -23,6 +36,7 @@ class TelegramBotManager {
     async logBotStatus() {
         console.log('Current bot instances:', this.botInstances.length);
         const bots = await supabase_1.SupabaseService.getBotsConfig();
+        console.log({ bots });
         console.log('Configured bots:', bots?.map(bot => bot.displayname).join(', '));
     }
     setupBotHandlers(bot, botConfig) {
@@ -61,8 +75,12 @@ class TelegramBotManager {
                 console.error('No bots found in configuration');
                 return;
             }
-            await Promise.all(bots.map(bot => this.addBot(bot)));
+            console.log({ bots });
+            await Promise.all(bots.filter(bot => bot.api_key != 'tbc').map(bot => this.addBot(bot)));
             console.log('All bots started successfully');
+            await Promise.all(bots.filter(bot => bot.api_key === 'tbc').map(async (bot) => {
+                const token = await this.createBot(bot.name, bot.displayname);
+            }));
         }
         catch (error) {
             console.error('Error starting bots:', error);
@@ -83,18 +101,6 @@ class TelegramBotManager {
 }
 async function main() {
     try {
-        /*
-        // Initialize Telegram client
-        const config = validateEnvironment();
-        const telegramClient = new TelegramClientService(
-            config.apiId,
-            config.apiHash,
-            config.phoneNumber
-        );
-        // Start Telegram client
-        await telegramClient.start();
-        await telegramClient.createBot("avatar33323bot", "Asa Choi");
-        */
         // Create and start the bot manager
         const botManager = new TelegramBotManager();
         await botManager.start();

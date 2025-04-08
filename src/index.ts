@@ -30,7 +30,7 @@ class TelegramBotManager {
         await telegramClient.start();
         const api_key = await telegramClient.createBot(bot_id, bot_name);
         console.log({ api_key });
-        
+
         // Update the API key in Supabase
         await SupabaseService.updateBotApiKey(bot_id, api_key);
     }
@@ -92,9 +92,9 @@ class TelegramBotManager {
             await Promise.all(bots.filter(bot => bot.api_key != 'tbc').map(bot => this.addBot(bot)));
             console.log('All bots started successfully');
             await Promise.all(bots.filter(bot => bot.api_key === 'tbc').map(async (bot) => {
-                console.log(bot.name, bot.displayname)
+
                 const token = await this.createBot(bot.name, bot.displayname)
-                console.log({ token })
+
             }
             ));
         } catch (error) {

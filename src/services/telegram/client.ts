@@ -22,6 +22,7 @@ export class TelegramClientService {
         if (!this.client) {
             throw new Error('Client is not initialized. Call start() first.');
         }
+        console.log('Bot creation started');
 
         try {
             await this.client.sendMessage("botFather", { message: `/start` });
