@@ -1,6 +1,6 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api';
 import { BotConfig, BotMessageHandler } from '../types';
-import { AIService } from '../services/ai';
+import { AIService } from '../model';
 import { SupabaseService } from '../services/supabase';
 
 export class MessageHandler implements BotMessageHandler {
@@ -19,7 +19,7 @@ export class MessageHandler implements BotMessageHandler {
             const displayName = currentConfig?.displayname || botConfig.displayname;
 
             if (text) {
-                const answer = await AIService.ask(text, systemPrompt);
+                const answer = await AIService.ask(text, systemPrompt, botConfig.id);
                 await bot.sendMessage(chatId, answer);
                 const chat = await bot.getChat(chatId);
                 console.log({chat});

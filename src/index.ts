@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { BotConfig } from './types';
 import { SupabaseService } from './services/supabase';
-import { AIService } from './services/ai';
+import { AIService } from './model';
 import { TelegramClientService } from './services/telegram/client';
 import { validateEnvironment } from './config/environment';
 import { ITelegramBotManager, IConfig } from './types/manager';
