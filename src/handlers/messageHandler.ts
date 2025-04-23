@@ -19,16 +19,13 @@ export class MessageHandler implements BotMessageHandler {
             const displayName = currentConfig?.displayname || botConfig.displayname;
 
             if (text) {
-                const answer = await AIService.ask(text, systemPrompt, botConfig.id);
-                await bot.sendMessage(chatId, answer);
                 const chat = await bot.getChat(chatId);
-                console.log({chat});
-                
-                // Get a user identifier - username if available, otherwise use first_name or chat ID
-                const userId = chat.username || 
-                               chat.first_name || 
-                               chat.title || 
-                               chatId.toString();
+                const userId = chat.username || chat.first_name || chat.title || chatId.toString();
+                const chatHistory = await SupabaseService.getChatHistory(botConfig.id, userId);
+                console.log({chatHistory});
+                const answer = await AIService.ask(text, systemPrompt, chatHistory);
+                await bot.sendMessage(chatId, answer);
+ 
                 
                 await SupabaseService.saveChatHistory(
                     botConfig.id,

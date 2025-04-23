@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessageHandler = void 0;
-const ai_1 = require("../services/ai");
+const model_1 = require("../model");
 const supabase_1 = require("../services/supabase");
 class MessageHandler {
     async handleMessage(bot, msg, botConfig) {
@@ -16,15 +16,12 @@ class MessageHandler {
             const systemPrompt = currentConfig?.system_prompt || botConfig.system_prompt;
             const displayName = currentConfig?.displayname || botConfig.displayname;
             if (text) {
-                const answer = await ai_1.AIService.ask(text, systemPrompt);
-                await bot.sendMessage(chatId, answer);
                 const chat = await bot.getChat(chatId);
-                console.log({ chat });
-                // Get a user identifier - username if available, otherwise use first_name or chat ID
-                const userId = chat.username ||
-                    chat.first_name ||
-                    chat.title ||
-                    chatId.toString();
+                const userId = chat.username || chat.first_name || chat.title || chatId.toString();
+                const chatHistory = await supabase_1.SupabaseService.getChatHistory(botConfig.id, userId);
+                console.log({ chatHistory });
+                const answer = await model_1.AIService.ask(text, systemPrompt, chatHistory);
+                await bot.sendMessage(chatId, answer);
                 await supabase_1.SupabaseService.saveChatHistory(botConfig.id, userId, chatId.toString(), text, answer);
             }
         }

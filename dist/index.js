@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
 const supabase_1 = require("./services/supabase");
-const ai_1 = require("./services/ai");
+const model_1 = require("./model");
 const client_1 = require("./services/telegram/client");
 const environment_1 = require("./config/environment");
 const botInstance_1 = require("./services/botInstance");
@@ -86,7 +86,7 @@ class TelegramBotManager {
             // Start the bot instance
             await botInstance.start();
             // Initialize AI service for the bot
-            await ai_1.AIService.initialize(process.env.GOOGLE_API_KEY || '');
+            await model_1.AIService.initialize(process.env.GOOGLE_API_KEY || '');
             this.logger.info('Bot added successfully', { botName: botConfig.displayname });
         }
         catch (error) {

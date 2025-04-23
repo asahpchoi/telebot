@@ -13,7 +13,7 @@ export class AIService {
         });
     }
 
-    static async ask(question: string, systemPrompt: string, botId?: string): Promise<string> {
+    static async ask(question: string, systemPrompt: string, chatHistory: any[] = []): Promise<string> {
         if (!this.ai) {
             await this.initialize();
         }
@@ -21,9 +21,13 @@ export class AIService {
             throw new Error('Failed to initialize AI service');
         }
 
+        const contents = chatHistory.length > 0 
+            ? [...chatHistory.map(h => h.message), question]
+            : [question];
+
         const response = await this.ai.models.generateContent({
             model: 'gemini-2.0-flash',
-            contents: [question],
+            contents: contents,
             config: {
                 systemInstruction: systemPrompt,
             },
